@@ -8,7 +8,7 @@ import { DocumentAnalyzer } from './document-analyzer';
 import { AnalysisResults } from './analysis-results';
 import { TaskBoard } from './task-board';
 import { AuditTrail } from './audit-trail';
-import type { AnalysisResult, AuthSession, DashboardStats } from '@/lib/types';
+import type { AnalysisResult, AuthSession, DashboardStats, Task } from '@/lib/types';
 
 const sectionTitles: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -43,10 +43,24 @@ export function DashboardView({
   const [activeSection, setActiveSection] = useState('dashboard');
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [documentsAnalysed, setDocumentsAnalysed] = useState(0);
+  const [tasks, setTasks] = useState<Task[]>([]);
 
   const handleAnalysisComplete = (result: AnalysisResult) => {
     setAnalysisResult(result);
     setDocumentsAnalysed((n) => n + 1);
+
+    const now = Date.now();
+    setTasks(
+      result.recommendedActions.map((action, i) => ({
+        id: `task-${now}-${i}`,
+        title: action,
+        status: 'to-review' as const,
+        priority: 'medium' as const,
+        owner: 'Unassigned',
+        dueDate: 'TBD',
+        linkedDocument: 'Recent Analysis',
+      })),
+    );
   };
 
   const stats: DashboardStats = {
@@ -105,7 +119,7 @@ export function DashboardView({
           <EmptyState message="Analyse a document to view risk flags." />
         );
       case 'tasks':
-        return <TaskBoard tasks={[]} />;
+        return <TaskBoard tasks={tasks} />;
       case 'audit-trail':
         return <AuditTrail events={[]} />;
       default:

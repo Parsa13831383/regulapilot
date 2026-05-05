@@ -80,12 +80,14 @@ export function AnalysisResults({ result }: AnalysisResultsProps) {
                     </div>
                     <PriorityBadge priority={obligation.priority} />
                   </div>
-                  <div className="flex items-start gap-2 rounded bg-muted/50 p-2">
-                    <Quote className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-                    <p className="text-xs italic text-muted-foreground">
-                      {obligation.sourceExcerpt}
-                    </p>
-                  </div>
+                  {obligation.sourceExcerpt && (
+                    <div className="flex items-start gap-2 rounded bg-muted/50 p-2">
+                      <Quote className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                      <p className="text-xs italic text-muted-foreground">
+                        {obligation.sourceExcerpt}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
