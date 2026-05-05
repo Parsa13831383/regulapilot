@@ -1,14 +1,14 @@
 # RegulaPilot – AI Compliance Workflow for Fintech Teams
 
-> Turn complex regulatory documents into clear obligations, risks, and action plans in minutes — not weeks.
+> Turn complex regulatory documents into structured obligations, risks, and action plans in minutes — not weeks.
 
 ---
 
 ## 🚀 Overview
 
-RegulaPilot is an AI-powered MVP designed to help fintech and regulated teams process complex compliance documents quickly and effectively.
+RegulaPilot is an AI-powered system designed to help fintech and regulated teams process complex compliance documents quickly and effectively.
 
-Instead of spending hours manually reviewing FCA guidance, AML/KYC policies, or internal compliance reports, RegulaPilot extracts:
+Instead of spending hours manually reviewing FCA guidance, AML/KYC policies, or internal compliance reports, RegulaPilot transforms unstructured regulatory text into:
 
 - ✅ Key obligations  
 - ⚠️ Potential risks  
@@ -16,7 +16,7 @@ Instead of spending hours manually reviewing FCA guidance, AML/KYC policies, or 
 
 All within seconds.
 
-This project was built as a **rapid prototype** to demonstrate how AI-native workflows can transform regulatory operations.
+This project was built as a **rapid prototype** to demonstrate how AI-native backend workflows can transform regulatory operations.
 
 ---
 
@@ -44,37 +44,103 @@ This leads to:
 
 ## 💡 Solution
 
-RegulaPilot converts unstructured regulatory text into structured outputs:
+RegulaPilot converts unstructured regulatory text into structured, traceable compliance data:
 
-1. **Paste regulatory or policy text**
-2. AI processes the content
-3. Outputs:
+1. Upload or paste regulatory text  
+2. Backend processes the content using an LLM  
+3. Outputs structured entities:
    - Obligations
    - Risks
-   - Action items
+   - Actionable tasks  
 
-All displayed in a clean, dashboard-style interface.
+These are presented in a clean dashboard for review and workflow management.
+
+---
+
+## 🧱 System Architecture
+
+RegulaPilot is built as a full-stack AI workflow system:
+
+- **Frontend**: React + Tailwind (deployed on Vercel)
+- **Backend API**: FastAPI (Python)
+- **AI Layer**: OpenAI (`gpt-4.1-mini`)
+- **Validation Layer**: Pydantic schemas
+- **Storage (MVP)**: In-memory data stores (designed for easy migration to PostgreSQL)
+
+### Core Flow
+
+1. User uploads a regulatory document  
+2. Backend sends content to LLM with a structured prompt  
+3. LLM returns JSON-formatted obligations  
+4. Backend validates and normalises the output  
+5. Structured data is exposed via REST API  
+
+---
+
+## ⚙️ Backend API
+
+The system exposes a RESTful API for managing compliance workflows.
+
+### Key Endpoints
+
+- `POST /users` → Create users  
+- `POST /documents` → Upload regulatory content  
+- `POST /documents/{id}/process` → Trigger AI extraction  
+- `GET /documents/{id}/obligations` → Retrieve extracted obligations  
+- `PATCH /obligations/{id}` → Update status, assign owner, set deadlines  
+
+### Design Highlights
+
+- Strong schema validation using **Pydantic**
+- Deterministic AI extraction (`temperature=0`)
+- JSON-only LLM responses (no brittle parsing)
+- Clean separation of concerns:
+  - `main.py` → API layer  
+  - `schemas.py` → data contracts  
+  - `LlmService.py` → AI pipeline  
+
+---
+
+## 🧠 AI Extraction Engine
+
+RegulaPilot transforms unstructured regulatory text into structured compliance entities.
+
+Each obligation includes:
+
+- Title  
+- Description  
+- Priority (`low` / `medium` / `high`)  
+- Status (`draft` → `review` → `approved` → `completed`)  
+- Source quote (verbatim traceability to original text)  
+
+### Key Design Decisions
+
+- **No hallucination policy** — all outputs must be grounded in source text  
+- **Verbatim traceability** — every obligation links back to exact text  
+- **Deterministic output** — consistent results across runs  
+- **Lenient validation** — partial extraction errors do not break the pipeline  
 
 ---
 
 ## ⚙️ Features
 
-- 📄 Document analysis (FCA, AML/KYC, contracts, internal policies)
-- 🧩 Obligation extraction
-- ⚠️ Risk identification
-- 📋 Task generation
-- 📊 Compliance dashboard overview
-- 🧪 Demo-friendly sample document loader
+- 📄 Regulatory document analysis (FCA, AML/KYC, internal policies)  
+- 🧩 Structured obligation extraction  
+- ⚠️ Risk identification  
+- 📋 Task generation  
+- 📊 Dashboard-style output  
+- 🧪 Demo-ready sample workflow  
 
 ---
 
 ## 🛠️ Tech Stack
 
-- Frontend: React + Tailwind CSS + shadcn UI  
-- Backend (planned/extendable): FastAPI  
-- Database (planned): MongoDB  
-- AI Integration: LLM-ready (mocked for MVP demo)  
-- Deployment: Vercel  
+- **Frontend**: React, Tailwind CSS, shadcn/ui  
+- **Backend**: FastAPI (Python)  
+- **Validation**: Pydantic v2  
+- **AI Integration**: OpenAI API (`gpt-4.1-mini`)  
+- **Deployment**: Vercel (frontend)  
+- **Storage (MVP)**: In-memory (designed for PostgreSQL upgrade)  
 
 ---
 
@@ -83,32 +149,32 @@ All displayed in a clean, dashboard-style interface.
 This is a **rapid prototype (MVP)** focused on:
 
 - Speed of execution  
-- Product validation  
-- Demonstrating AI workflow potential  
+- Validating the core AI workflow  
+- Demonstrating structured extraction from real regulatory text  
 
-Some features are intentionally simplified or mocked for demo purposes.
+Some production features (auth, database, async jobs) are intentionally deferred.
 
 ---
 
 ## 🔮 Future Improvements
 
-- 🔗 Real LLM integration (OpenAI / Claude / Gemini)
-- 🗂️ Persistent document storage
-- 🔐 Authentication & multi-team workspace
-- 📤 Export audit reports (PDF/CSV)
-- 🔄 Workflow automation (Kanban-style task tracking)
-- 📡 Real-time monitoring & alerts
+- 🗄️ PostgreSQL + SQLAlchemy integration  
+- 🔐 JWT authentication & role-based access  
+- 📤 Exportable audit reports (PDF/CSV)  
+- 🔄 Workflow automation (task lifecycle + assignment)  
+- 📡 Async processing for large documents  
+- 📂 File upload (PDF/DOCX parsing)  
 
 ---
 
-## 🎯 Why This Project
+## 🚀 Why This Project
 
-This project was built to demonstrate:
+This project demonstrates:
 
-- Ability to **ship quickly**  
-- Strong **product thinking**  
-- Understanding of **AI-native workflows**  
-- Building solutions for **real-world problems (fintech/compliance)**  
+- Building **AI-native backend systems**, not just UI demos  
+- Designing **structured extraction pipelines using LLMs**  
+- Applying **clean API architecture and validation layers**  
+- Solving **real-world fintech compliance problems**  
 
 ---
 
@@ -124,10 +190,10 @@ If you're working in fintech, compliance, or AI products, I’d love your feedba
 Full-Stack Developer  
 
 🌐 Portfolio: https://parsananavazadeh.com  
-💼 LinkedIn: (add your link)
+💼 LinkedIn: www.linkedin.com/in/parsa13831383  
 
 ---
 
 ## ⚡ Note
 
-This project was built in a short timeframe as a **proof-of-concept**, focusing on impact and execution speed rather than production-level completeness.
+This project was built as a **high-speed proof-of-concept**, prioritising execution, clarity of idea, and system design over production completeness.
