@@ -1,3 +1,6 @@
+# Run locally:     uvicorn main:app --reload --port 8000
+# Run production:  uvicorn main:app --host 0.0.0.0 --port $PORT
+
 import os
 import secrets
 import uuid
@@ -9,6 +12,8 @@ from fastapi import Depends, FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
+# load_dotenv is a no-op when .env is absent (e.g. on Render, which injects
+# env vars directly). In development it reads backend/.env.
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 from schemas import (
@@ -25,10 +30,14 @@ from database import Base, engine, get_db, InviteCode, SessionRecord
 app = FastAPI(title="RegulaPilot API", version="0.1.0")
 
 # ── CORS ───────────────────────────────────────────────────────────────────
+# Set ALLOWED_ORIGINS on Render as a comma-separated list, e.g.:
+#   https://parsananavazadeh.com,https://regula-pilot.vercel.app
+_origins_env = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
