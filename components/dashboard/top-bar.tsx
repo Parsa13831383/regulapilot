@@ -43,14 +43,13 @@ export function TopBar({ title, onBack, onSignOut, remainingRuns }: TopBarProps)
         </Button>
         {onSignOut && (
           <Button
-            variant="ghost"
-            size="icon"
+            variant="outline"
+            size="sm"
             onClick={onSignOut}
-            className="text-muted-foreground hover:text-foreground"
-            title="Sign out"
+            className="gap-1.5 text-muted-foreground hover:text-foreground"
           >
-            <LogOut className="h-4 w-4" />
-            <span className="sr-only">Sign out</span>
+            <LogOut className="h-3.5 w-3.5" />
+            Sign out
           </Button>
         )}
       </div>

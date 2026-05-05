@@ -20,13 +20,16 @@ Example document types:
 • Compliance review notes`;
 
 const ERROR_MESSAGES: Record<string, string> = {
-  invalid_token: 'Your session has expired. Please sign out and enter your access code again.',
-  no_remaining_runs: 'You have no remaining processing runs. Please contact the team for more.',
+  invalid_token: 'Your session is no longer valid. Please enter a new access code.',
+  no_remaining_runs: 'You have used all your processing runs. Please enter a new access code.',
 };
+
+const AUTH_ERRORS = new Set(['invalid_token', 'expired_session', 'no_remaining_runs']);
 
 interface DocumentAnalyzerProps {
   onAnalysisComplete: (result: AnalysisResult) => void;
   onSessionUpdate: (session: AuthSession) => void;
+  onSignOut?: (reason: string) => void;
   session: AuthSession | null;
   initialText?: string;
 }
@@ -34,6 +37,7 @@ interface DocumentAnalyzerProps {
 export function DocumentAnalyzer({
   onAnalysisComplete,
   onSessionUpdate,
+  onSignOut,
   session,
   initialText,
 }: DocumentAnalyzerProps) {
@@ -60,11 +64,17 @@ export function DocumentAnalyzer({
       onAnalysisComplete(analysisResult);
     } catch (err) {
       if (err instanceof ApiError) {
+        if (AUTH_ERRORS.has(err.detail) && onSignOut) {
+          onSignOut(
+            ERROR_MESSAGES[err.detail] ??
+              'Your session is no longer valid. Please enter a new access code.',
+          );
+          return;
+        }
         setError(
-          ERROR_MESSAGES[err.detail] ??
-            (err.status === 502
-              ? 'AI processing failed. Please try again — the OpenAI key may not be set.'
-              : `Request failed: ${err.detail}`),
+          err.status === 502
+            ? 'AI processing failed. Please try again — the OpenAI key may not be set.'
+            : `Request failed: ${err.detail}`,
         );
       } else {
         setError('Could not reach the backend. Is the server running on port 8000?');

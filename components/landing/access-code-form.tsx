@@ -12,6 +12,7 @@ import type { AuthSession } from '@/lib/types';
 interface AccessCodeFormProps {
   onSuccess: (session: AuthSession) => void;
   onBack: () => void;
+  initialMessage?: string;
 }
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -21,7 +22,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   no_remaining_runs: 'This access code has no remaining runs. Please request a new one.',
 };
 
-export function AccessCodeForm({ onSuccess, onBack }: AccessCodeFormProps) {
+export function AccessCodeForm({ onSuccess, onBack, initialMessage }: AccessCodeFormProps) {
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +82,11 @@ export function AccessCodeForm({ onSuccess, onBack }: AccessCodeFormProps) {
           </CardHeader>
 
           <CardContent>
+            {initialMessage && (
+              <div className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                {initialMessage}
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <div className="relative">

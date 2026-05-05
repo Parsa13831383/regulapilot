@@ -21,7 +21,7 @@ const sectionTitles: Record<string, string> = {
 
 interface DashboardViewProps {
   onBack?: () => void;
-  onSignOut?: () => void;
+  onSignOut?: (reason?: string) => void;
   session: AuthSession | null;
   onSessionUpdate: (session: AuthSession) => void;
 }
@@ -60,6 +60,7 @@ export function DashboardView({
     session,
     onSessionUpdate,
     onAnalysisComplete: handleAnalysisComplete,
+    onSignOut,
   };
 
   const renderContent = () => {

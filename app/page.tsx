@@ -32,6 +32,7 @@ function clearSession() {
 export default function Home() {
   const [view, setView] = useState<View>('landing');
   const [session, setSession] = useState<AuthSession | null>(null);
+  const [signOutReason, setSignOutReason] = useState<string | null>(null);
 
   // Hydrate session from localStorage after mount (avoids SSR mismatch)
   useEffect(() => {
@@ -50,6 +51,7 @@ export default function Home() {
   const handleSessionReady = (newSession: AuthSession) => {
     saveSession(newSession);
     setSession(newSession);
+    setSignOutReason(null);
     setView('dashboard');
   };
 
@@ -58,17 +60,26 @@ export default function Home() {
     setSession(updated);
   };
 
-  const handleSignOut = () => {
+  // Called with no reason for manual sign-out (→ landing).
+  // Called with a reason by auth errors (→ access-code with message).
+  const handleSignOut = (reason?: string) => {
     clearSession();
     setSession(null);
-    setView('landing');
+    if (reason) {
+      setSignOutReason(reason);
+      setView('access-code');
+    } else {
+      setSignOutReason(null);
+      setView('landing');
+    }
   };
 
   if (view === 'access-code') {
     return (
       <AccessCodeForm
         onSuccess={handleSessionReady}
-        onBack={() => setView('landing')}
+        onBack={() => { setSignOutReason(null); setView('landing'); }}
+        initialMessage={signOutReason ?? undefined}
       />
     );
   }
