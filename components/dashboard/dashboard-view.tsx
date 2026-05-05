@@ -8,13 +8,14 @@ import { DocumentAnalyzer } from './document-analyzer';
 import { AnalysisResults } from './analysis-results';
 import { TaskBoard } from './task-board';
 import { AuditTrail } from './audit-trail';
-import { 
-  dashboardStats, 
-  mockTasks, 
-  mockAuditTrail,
-  mockAnalysisResult
-} from '@/lib/mock-data';
-import type { AnalysisResult } from '@/lib/types';
+import type { AnalysisResult, DashboardStats } from '@/lib/types';
+
+const emptyStats: DashboardStats = {
+  documentsAnalysed: 0,
+  openObligations: 0,
+  highRiskItems: 0,
+  tasksGenerated: 0,
+};
 
 const sectionTitles: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -27,6 +28,14 @@ const sectionTitles: Record<string, string> = {
 
 interface DashboardViewProps {
   onBack?: () => void;
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed border-border">
+      <p className="text-sm text-muted-foreground">{message}</p>
+    </div>
+  );
 }
 
 export function DashboardView({ onBack }: DashboardViewProps) {
@@ -42,7 +51,7 @@ export function DashboardView({ onBack }: DashboardViewProps) {
       case 'dashboard':
         return (
           <div className="space-y-8">
-            <StatsCards stats={dashboardStats} />
+            <StatsCards stats={emptyStats} />
             <div className="grid gap-6 lg:grid-cols-2">
               <DocumentAnalyzer onAnalysisComplete={handleAnalysisComplete} />
               {analysisResult && (
@@ -61,21 +70,27 @@ export function DashboardView({ onBack }: DashboardViewProps) {
           </div>
         );
       case 'obligations':
-        return <AnalysisResults result={mockAnalysisResult} />;
+        return analysisResult ? (
+          <AnalysisResults result={analysisResult} />
+        ) : (
+          <EmptyState message="Analyse a document to view extracted obligations." />
+        );
       case 'risk-review':
-        return (
+        return analysisResult ? (
           <div className="space-y-6">
             <AnalysisResults result={{
-              ...mockAnalysisResult,
+              ...analysisResult,
               obligations: [],
               recommendedActions: [],
             }} />
           </div>
+        ) : (
+          <EmptyState message="Analyse a document to view risk flags." />
         );
       case 'tasks':
-        return <TaskBoard tasks={mockTasks} />;
+        return <TaskBoard tasks={[]} />;
       case 'audit-trail':
-        return <AuditTrail events={mockAuditTrail} />;
+        return <AuditTrail events={[]} />;
       default:
         return null;
     }

@@ -6,9 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Spinner } from '@/components/ui/spinner';
 import { FileText, Sparkles } from 'lucide-react';
-import { placeholderDocumentText, mockAnalysisResult } from '@/lib/mock-data';
-import { sampleDocument } from '@/lib/sample-document';
 import type { AnalysisResult } from '@/lib/types';
+
+const PLACEHOLDER = `Paste FCA guidance, compliance notes, contract clauses, or internal policy text here...
+
+Example document types:
+• FCA regulatory guidance
+• AML/KYC policy documents
+• Credit risk assessments
+• Customer onboarding procedures
+• Internal audit findings
+• Compliance review notes`;
 
 interface DocumentAnalyzerProps {
   onAnalysisComplete: (result: AnalysisResult) => void;
@@ -18,25 +26,32 @@ interface DocumentAnalyzerProps {
 export function DocumentAnalyzer({ onAnalysisComplete, initialText }: DocumentAnalyzerProps) {
   const [documentText, setDocumentText] = useState(initialText || '');
   const [isAnalysing, setIsAnalysing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleAnalyse = async () => {
     if (!documentText.trim()) return;
-    
+
     setIsAnalysing(true);
-    
-    // TODO: Replace with actual LLM API call
-    // const response = await fetch('/api/analyse', {
-    //   method: 'POST',
-    //   body: JSON.stringify({ document: documentText }),
-    // });
-    // const result = await response.json();
-    
-    // Simulate AI processing time
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Use mock data for demo
-    onAnalysisComplete(mockAnalysisResult);
-    setIsAnalysing(false);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/analyse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document: documentText }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Analysis failed: ${response.statusText}`);
+      }
+
+      const result: AnalysisResult = await response.json();
+      onAnalysisComplete(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Analysis failed. Please try again.');
+    } finally {
+      setIsAnalysing(false);
+    }
   };
 
   return (
@@ -49,13 +64,16 @@ export function DocumentAnalyzer({ onAnalysisComplete, initialText }: DocumentAn
       </CardHeader>
       <CardContent className="space-y-4">
         <Textarea
-          placeholder={placeholderDocumentText}
+          placeholder={PLACEHOLDER}
           value={documentText}
           onChange={(e) => setDocumentText(e.target.value)}
           className="min-h-[200px] resize-none border-input bg-input text-foreground placeholder:text-muted-foreground focus-visible:ring-primary"
         />
-        <Button 
-          onClick={handleAnalyse} 
+        {error && (
+          <p className="text-sm text-destructive">{error}</p>
+        )}
+        <Button
+          onClick={handleAnalyse}
           disabled={isAnalysing || !documentText.trim()}
           className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
         >
@@ -71,22 +89,9 @@ export function DocumentAnalyzer({ onAnalysisComplete, initialText }: DocumentAn
             </>
           )}
         </Button>
-        <div className="flex items-center justify-center gap-2">
-          <p className="text-xs text-muted-foreground">
-            AI will extract obligations, risks, and generate action items
-          </p>
-          {!documentText && (
-            <>
-              <span className="text-xs text-muted-foreground">•</span>
-              <button
-                onClick={() => setDocumentText(sampleDocument)}
-                className="text-xs text-primary hover:underline"
-              >
-                Load sample document
-              </button>
-            </>
-          )}
-        </div>
+        <p className="text-center text-xs text-muted-foreground">
+          AI will extract obligations, risks, and generate action items
+        </p>
       </CardContent>
     </Card>
   );
