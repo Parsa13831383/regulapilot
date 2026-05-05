@@ -8,14 +8,7 @@ import { DocumentAnalyzer } from './document-analyzer';
 import { AnalysisResults } from './analysis-results';
 import { TaskBoard } from './task-board';
 import { AuditTrail } from './audit-trail';
-import type { AnalysisResult, DashboardStats } from '@/lib/types';
-
-const emptyStats: DashboardStats = {
-  documentsAnalysed: 0,
-  openObligations: 0,
-  highRiskItems: 0,
-  tasksGenerated: 0,
-};
+import type { AnalysisResult, AuthSession, DashboardStats } from '@/lib/types';
 
 const sectionTitles: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -28,6 +21,9 @@ const sectionTitles: Record<string, string> = {
 
 interface DashboardViewProps {
   onBack?: () => void;
+  onSignOut?: () => void;
+  session: AuthSession | null;
+  onSessionUpdate: (session: AuthSession) => void;
 }
 
 function EmptyState({ message }: { message: string }) {
@@ -38,12 +34,32 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
-export function DashboardView({ onBack }: DashboardViewProps) {
+export function DashboardView({
+  onBack,
+  onSignOut,
+  session,
+  onSessionUpdate,
+}: DashboardViewProps) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [documentsAnalysed, setDocumentsAnalysed] = useState(0);
 
   const handleAnalysisComplete = (result: AnalysisResult) => {
     setAnalysisResult(result);
+    setDocumentsAnalysed((n) => n + 1);
+  };
+
+  const stats: DashboardStats = {
+    documentsAnalysed,
+    openObligations: analysisResult?.obligations.length ?? 0,
+    highRiskItems: analysisResult?.riskFlags.length ?? 0,
+    tasksGenerated: analysisResult?.recommendedActions.length ?? 0,
+  };
+
+  const analyzerProps = {
+    session,
+    onSessionUpdate,
+    onAnalysisComplete: handleAnalysisComplete,
   };
 
   const renderContent = () => {
@@ -51,9 +67,9 @@ export function DashboardView({ onBack }: DashboardViewProps) {
       case 'dashboard':
         return (
           <div className="space-y-8">
-            <StatsCards stats={emptyStats} />
+            <StatsCards stats={stats} />
             <div className="grid gap-6 lg:grid-cols-2">
-              <DocumentAnalyzer onAnalysisComplete={handleAnalysisComplete} />
+              <DocumentAnalyzer {...analyzerProps} />
               {analysisResult && (
                 <div className="lg:col-span-2">
                   <AnalysisResults result={analysisResult} />
@@ -65,7 +81,7 @@ export function DashboardView({ onBack }: DashboardViewProps) {
       case 'documents':
         return (
           <div className="space-y-6">
-            <DocumentAnalyzer onAnalysisComplete={handleAnalysisComplete} />
+            <DocumentAnalyzer {...analyzerProps} />
             {analysisResult && <AnalysisResults result={analysisResult} />}
           </div>
         );
@@ -100,7 +116,12 @@ export function DashboardView({ onBack }: DashboardViewProps) {
     <div className="min-h-screen bg-background">
       <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
       <div className="md:pl-64">
-        <TopBar title={sectionTitles[activeSection] || 'RegulaPilot'} onBack={onBack} />
+        <TopBar
+          title={sectionTitles[activeSection] ?? 'RegulaPilot'}
+          onBack={onBack}
+          onSignOut={onSignOut}
+          remainingRuns={session?.remainingRuns}
+        />
         <main className="p-4 pt-16 md:p-6 md:pt-6">
           {renderContent()}
         </main>

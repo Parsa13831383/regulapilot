@@ -1,29 +1,98 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Hero } from '@/components/landing/hero';
 import { HowItWorks } from '@/components/landing/how-it-works';
 import { FounderDemo } from '@/components/landing/founder-demo';
+import { AccessCodeForm } from '@/components/landing/access-code-form';
 import { DashboardView } from '@/components/dashboard/dashboard-view';
+import type { AuthSession } from '@/lib/types';
 
-type View = 'landing' | 'dashboard';
+type View = 'landing' | 'access-code' | 'dashboard';
+
+const SESSION_KEY = 'regulapilot_session';
+
+function loadSession(): AuthSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as AuthSession) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(session: AuthSession) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
 
 export default function Home() {
   const [view, setView] = useState<View>('landing');
+  const [session, setSession] = useState<AuthSession | null>(null);
+
+  // Hydrate session from localStorage after mount (avoids SSR mismatch)
+  useEffect(() => {
+    const stored = loadSession();
+    if (stored) setSession(stored);
+  }, []);
+
+  const handleTryDemo = () => {
+    if (session) {
+      setView('dashboard');
+    } else {
+      setView('access-code');
+    }
+  };
+
+  const handleSessionReady = (newSession: AuthSession) => {
+    saveSession(newSession);
+    setSession(newSession);
+    setView('dashboard');
+  };
+
+  const handleSessionUpdate = (updated: AuthSession) => {
+    saveSession(updated);
+    setSession(updated);
+  };
+
+  const handleSignOut = () => {
+    clearSession();
+    setSession(null);
+    setView('landing');
+  };
+
+  if (view === 'access-code') {
+    return (
+      <AccessCodeForm
+        onSuccess={handleSessionReady}
+        onBack={() => setView('landing')}
+      />
+    );
+  }
 
   if (view === 'dashboard') {
-    return <DashboardView onBack={() => setView('landing')} />;
+    return (
+      <DashboardView
+        session={session}
+        onSessionUpdate={handleSessionUpdate}
+        onBack={() => setView('landing')}
+        onSignOut={handleSignOut}
+      />
+    );
   }
 
   return (
     <main className="min-h-screen bg-background">
-      <Hero 
-        onTryDemo={() => setView('dashboard')} 
-        onViewWorkflow={() => setView('dashboard')} 
+      <Hero
+        onTryDemo={handleTryDemo}
+        onViewWorkflow={handleTryDemo}
       />
       <HowItWorks />
       <FounderDemo />
-      
+
       {/* Footer */}
       <footer className="border-t border-border bg-background py-12">
         <div className="mx-auto max-w-6xl px-6">

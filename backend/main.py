@@ -1,21 +1,54 @@
+import os
+import secrets
 import uuid
-from datetime import datetime, timezone
-from fastapi import FastAPI, HTTPException
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
 from schemas import (
     User, UserCreate,
     Document, DocumentCreate, DocumentStatus,
     Obligation, ObligationUpdate, ObligationStatus,
     ProcessDocumentResponse,
+    RedeemCodeRequest, RedeemCodeResponse,
+    AdminInviteCodeResponse,
 )
 from LlmService import extract_obligations_from_text
 
 app = FastAPI(title="RegulaPilot API", version="0.1.0")
+
+# ── CORS ───────────────────────────────────────────────────────────────────
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ── Config ─────────────────────────────────────────────────────────────────
+
+ADMIN_SECRET: str = os.getenv("ADMIN_SECRET", "")
+CODE_TTL = timedelta(days=3)
+SESSION_RUNS = 2  # LLM processing runs granted per redeemed code
 
 # ── In-memory stores ───────────────────────────────────────────────────────
 
 users_db: dict[str, User] = {}
 documents_db: dict[str, Document] = {}
 obligations_db: dict[str, Obligation] = {}
+
+# invite_codes_db: code → { created_at, redeemed }
+invite_codes_db: dict[str, dict] = {}
+
+# sessions_db: token → { remaining_runs }
+sessions_db: dict[str, dict] = {}
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -28,11 +61,56 @@ def new_id() -> str:
     return str(uuid.uuid4())
 
 
+def get_session(authorization: Optional[str]) -> Optional[dict]:
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization.removeprefix("Bearer ").strip()
+    return sessions_db.get(token)
+
+
 # ── Health ─────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def health():
     return {"api": "RegulaPilot", "status": "ok"}
+
+
+# ── Admin ──────────────────────────────────────────────────────────────────
+
+@app.post("/admin/invite-codes", response_model=AdminInviteCodeResponse)
+def create_invite_code(x_admin_secret: Optional[str] = Header(None)):
+    if not ADMIN_SECRET or x_admin_secret != ADMIN_SECRET:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    code = secrets.token_urlsafe(16)
+    invite_codes_db[code] = {"created_at": now(), "redeemed": False}
+
+    return AdminInviteCodeResponse(code=code, expiresInDays=CODE_TTL.days)
+
+
+# ── Auth ───────────────────────────────────────────────────────────────────
+
+@app.post("/auth/redeem-code", response_model=RedeemCodeResponse)
+def redeem_code(body: RedeemCodeRequest):
+    code = body.inviteCode.strip()
+    record = invite_codes_db.get(code)
+
+    if record is None:
+        raise HTTPException(status_code=403, detail="invalid_code")
+
+    if record["redeemed"]:
+        raise HTTPException(status_code=403, detail="already_used")
+
+    if now() - record["created_at"] > CODE_TTL:
+        raise HTTPException(status_code=403, detail="expired_code")
+
+    # Mark as redeemed — one-time use enforced here
+    record["redeemed"] = True
+
+    token = new_id()
+    sessions_db[token] = {"remaining_runs": SESSION_RUNS}
+
+    return RedeemCodeResponse(token=token, remainingRuns=SESSION_RUNS)
 
 
 # ── Users ──────────────────────────────────────────────────────────────────
@@ -90,7 +168,17 @@ def get_document(document_id: str):
 
 
 @app.post("/documents/{document_id}/process", response_model=ProcessDocumentResponse)
-def process_document(document_id: str):
+def process_document(
+    document_id: str,
+    authorization: Optional[str] = Header(None),
+):
+    # Auth check — must happen before any work
+    session = get_session(authorization)
+    if session is None:
+        raise HTTPException(status_code=401, detail="invalid_token")
+    if session["remaining_runs"] <= 0:
+        raise HTTPException(status_code=403, detail="no_remaining_runs")
+
     doc = documents_db.get(document_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -99,15 +187,18 @@ def process_document(document_id: str):
     doc = doc.model_copy(update={"status": DocumentStatus.processing, "updatedAt": now()})
     documents_db[document_id] = doc
 
-    # Extract obligations via OpenAI
+    # Call OpenAI — run is only counted if this succeeds
     try:
         extracted = extract_obligations_from_text(doc.content)
     except RuntimeError as exc:
-        # Roll back to uploaded so the caller can retry after fixing config
+        # Roll back status so the caller can retry without losing a run
         documents_db[document_id] = doc.model_copy(
             update={"status": DocumentStatus.uploaded, "updatedAt": now()}
         )
         raise HTTPException(status_code=502, detail=str(exc))
+
+    # Decrement only after a successful extraction
+    session["remaining_runs"] -= 1
 
     created_obligations: list[Obligation] = []
     for item in extracted:
@@ -125,11 +216,14 @@ def process_document(document_id: str):
         obligations_db[obligation.id] = obligation
         created_obligations.append(obligation)
 
-    # Mark as processed
     doc = doc.model_copy(update={"status": DocumentStatus.processed, "updatedAt": now()})
     documents_db[document_id] = doc
 
-    return ProcessDocumentResponse(document=doc, obligations=created_obligations)
+    return ProcessDocumentResponse(
+        document=doc,
+        obligations=created_obligations,
+        remainingRuns=session["remaining_runs"],
+    )
 
 
 # ── Obligations ────────────────────────────────────────────────────────────
@@ -152,7 +246,6 @@ def update_obligation(obligation_id: str, body: ObligationUpdate):
     if not obligation:
         raise HTTPException(status_code=404, detail="Obligation not found")
 
-    # Only apply fields that were explicitly provided in the request
     changes = body.model_dump(exclude_none=True)
     changes["updatedAt"] = now()
 

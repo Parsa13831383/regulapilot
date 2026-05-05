@@ -49,3 +49,36 @@ export interface DashboardStats {
   highRiskItems: number;
   tasksGenerated: number;
 }
+
+// ── Session ────────────────────────────────────────────────────────────────
+
+export interface AuthSession {
+  token: string;
+  remainingRuns: number;
+  userId: string;
+}
+
+// ── Backend API shapes (as returned by FastAPI) ────────────────────────────
+
+export interface BackendObligation {
+  id: string;
+  documentId: string;
+  title: string;
+  description: string;
+  sourceQuote: string;
+  priority: Priority;
+  status: string;
+  dueDate?: string | null;
+  ownerUserId?: string | null;
+}
+
+export interface BackendDocument {
+  id: string;
+  title: string;
+}
+
+export interface BackendProcessResponse {
+  document: BackendDocument;
+  obligations: BackendObligation[];
+  remainingRuns?: number | null;
+}

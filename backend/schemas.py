@@ -88,8 +88,25 @@ class Obligation(BaseModel):
     updatedAt: datetime
 
 
+# ── Auth ───────────────────────────────────────────────────────────────────
+
+class RedeemCodeRequest(BaseModel):
+    inviteCode: str
+
+
+class RedeemCodeResponse(BaseModel):
+    token: str
+    remainingRuns: int
+
+
+class AdminInviteCodeResponse(BaseModel):
+    code: str
+    expiresInDays: int
+
+
 # ── Response wrappers ──────────────────────────────────────────────────────
 
 class ProcessDocumentResponse(BaseModel):
     document: Document
     obligations: list[Obligation]
+    remainingRuns: Optional[int] = None

@@ -1,14 +1,17 @@
 'use client';
 
-import { ArrowLeft, Bell, Search, User } from 'lucide-react';
+import { ArrowLeft, Bell, Search, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface TopBarProps {
   title: string;
   onBack?: () => void;
+  onSignOut?: () => void;
+  remainingRuns?: number;
 }
 
-export function TopBar({ title, onBack }: TopBarProps) {
+export function TopBar({ title, onBack, onSignOut, remainingRuns }: TopBarProps) {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex items-center gap-3">
@@ -20,8 +23,16 @@ export function TopBar({ title, onBack }: TopBarProps) {
         )}
         <h1 className="text-lg font-semibold text-foreground">{title}</h1>
       </div>
-      
+
       <div className="flex items-center gap-3">
+        {remainingRuns !== undefined && (
+          <Badge
+            variant="outline"
+            className="hidden gap-1.5 border-border text-xs text-muted-foreground sm:flex"
+          >
+            {remainingRuns} run{remainingRuns !== 1 ? 's' : ''} left
+          </Badge>
+        )}
         <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
           <Search className="h-4 w-4" />
           <span className="sr-only">Search</span>
@@ -30,10 +41,18 @@ export function TopBar({ title, onBack }: TopBarProps) {
           <Bell className="h-4 w-4" />
           <span className="sr-only">Notifications</span>
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted">
-          <User className="h-4 w-4" />
-          <span className="sr-only">User menu</span>
-        </Button>
+        {onSignOut && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onSignOut}
+            className="text-muted-foreground hover:text-foreground"
+            title="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="sr-only">Sign out</span>
+          </Button>
+        )}
       </div>
     </header>
   );
