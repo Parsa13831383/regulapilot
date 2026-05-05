@@ -69,6 +69,17 @@ def now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def ensure_aware_utc(dt: datetime) -> datetime:
+    """Normalise a datetime from the DB to UTC-aware.
+
+    SQLite stores datetimes without timezone info; Postgres preserves it.
+    This makes comparisons with now() safe on both.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def new_id() -> str:
     return str(uuid.uuid4())
 
@@ -122,7 +133,7 @@ def redeem_code(body: RedeemCodeRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="invalid_code")
     if invite.redeemed_at is not None:
         raise HTTPException(status_code=403, detail="already_used")
-    if now() > invite.expires_at:
+    if now() > ensure_aware_utc(invite.expires_at):
         raise HTTPException(status_code=403, detail="expired_code")
 
     invite.redeemed_at = now()
