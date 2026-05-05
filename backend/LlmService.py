@@ -2,11 +2,12 @@
 LLM extraction service — OpenAI backend.
 
 To swap models or providers, only this file needs to change.
-The public contract is: extract_obligations_from_text(text) -> list[dict]
-Each dict contains: title, description, sourceQuote, priority, status.
+Public contract: extract_compliance_data(text) -> dict
+Returns: {"obligations": [...], "risks": [...], "actions": [...]}
 """
 
 import json
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -14,52 +15,54 @@ from openai import OpenAI, OpenAIError
 
 load_dotenv()
 
-# ---------------------------------------------------------------------------
-# System prompt — sent with every extraction request
-# ---------------------------------------------------------------------------
+logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = """
-You are a compliance extraction engine. Read the provided regulatory or compliance text and extract every compliance obligation it contains.
+_SYSTEM_PROMPT = """You are a compliance AI. Extract obligations, risks, and actions from the text.
+Return ONLY valid JSON matching the schema. Do not include explanations.
 
-Return ONLY a valid JSON array — no markdown fences, no explanation, nothing else. Use this exact shape:
-
-[
-  {
-    "title": "short obligation title",
-    "description": "detailed explanation of what must be done and by whom",
-    "sourceQuote": "verbatim excerpt copied from the input text that grounds this obligation",
-    "priority": "high | medium | low",
-    "status": "draft"
-  }
-]
+{
+  "obligations": [
+    { "text": "string", "priority": "low|medium|high" }
+  ],
+  "risks": [
+    { "text": "string", "severity": "low|medium|high" }
+  ],
+  "actions": [
+    { "text": "string" }
+  ]
+}
 
 Rules:
-- Do NOT invent obligations. Every obligation must be directly grounded in the provided text.
-- sourceQuote must be an exact verbatim excerpt from the input text — copy-paste, not paraphrased.
-- Set priority to "high" when the obligation involves: legal deadlines, sanctions, AML/KYC requirements, suspicious activity reporting, fraud prevention, or high-risk customer procedures.
-- Set priority to "medium" for operational or process requirements without hard deadlines.
-- Set priority to "low" for administrative, awareness, or best-practice items.
-- status must always be "draft".
-- If no compliance obligations are found, return an empty JSON array: []
-""".strip()
+- obligations: specific requirements or duties the organisation must fulfil
+- risks: compliance risks, gaps, or exposures identified in the text
+- actions: concrete steps that should be taken to address obligations or risks
+- priority/severity "high": legal deadlines, sanctions, AML/KYC, suspicious activity reporting, fraud prevention
+- priority/severity "medium": operational or process requirements without hard deadlines
+- priority/severity "low": administrative, awareness, or best-practice items
+- Every item must be grounded in the provided text — do not invent content
+- If a section has no items, return an empty array for that key"""
 
-# ---------------------------------------------------------------------------
-# Public function
-# ---------------------------------------------------------------------------
+_VALID_LEVELS = {"low", "medium", "high"}
 
-def extract_obligations_from_text(text: str) -> list[dict]:
+
+def extract_compliance_data(text: str) -> dict:
     """
-    Call OpenAI to extract compliance obligations from regulatory text.
+    Call OpenAI to extract compliance obligations, risks, and actions.
+
+    Returns:
+        {
+            "obligations": [{"text": str, "priority": str}, ...],
+            "risks":       [{"text": str, "severity": str}, ...],
+            "actions":     [{"text": str}, ...],
+        }
 
     Raises:
-        RuntimeError: if OPENAI_API_KEY is missing.
-        RuntimeError: if the OpenAI call fails or returns unparseable JSON.
+        RuntimeError: if OPENAI_API_KEY is missing, the API call fails,
+                      or the response cannot be parsed as JSON.
     """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError(
-            "OPENAI_API_KEY is missing. Add it to your .env file."
-        )
+        raise RuntimeError("OPENAI_API_KEY is missing. Add it to your .env file.")
 
     client = OpenAI(api_key=api_key)
 
@@ -71,10 +74,7 @@ def extract_obligations_from_text(text: str) -> list[dict]:
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {
                     "role": "user",
-                    "content": (
-                        "Extract all compliance obligations from the following text:\n\n"
-                        + text
-                    ),
+                    "content": f"Extract compliance data from this text:\n\n{text}",
                 },
             ],
             temperature=0,  # deterministic — extraction is not a creative task
@@ -87,60 +87,52 @@ def extract_obligations_from_text(text: str) -> list[dict]:
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError as exc:
+        logger.error("OpenAI returned non-JSON response: %r", raw[:500])
         raise RuntimeError(
             f"OpenAI returned non-JSON content: {raw[:200]!r}"
         ) from exc
 
-    # The model wraps arrays in an object when json_object mode is on.
-    # Unwrap common wrapper keys if needed.
-    if isinstance(parsed, dict):
-        for key in ("obligations", "items", "results", "data"):
-            if isinstance(parsed.get(key), list):
-                parsed = parsed[key]
-                break
-        else:
-            # Fallback: grab the first list value in the dict
-            lists = [v for v in parsed.values() if isinstance(v, list)]
-            parsed = lists[0] if lists else []
-
-    if not isinstance(parsed, list):
-        raise RuntimeError(
-            f"Expected a JSON array of obligations, got: {type(parsed).__name__}"
-        )
-
-    return [_validate_obligation(item, i) for i, item in enumerate(parsed)]
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-_VALID_PRIORITIES = {"low", "medium", "high"}
-_VALID_STATUSES = {"draft", "review", "approved", "completed"}
+    return {
+        "obligations": [
+            _validate_obligation(o, i)
+            for i, o in enumerate(parsed.get("obligations", []))
+        ],
+        "risks": [
+            _validate_risk(r, i)
+            for i, r in enumerate(parsed.get("risks", []))
+        ],
+        "actions": [
+            _validate_action(a, i)
+            for i, a in enumerate(parsed.get("actions", []))
+        ],
+    }
 
 
 def _validate_obligation(item: dict, index: int) -> dict:
-    """
-    Coerce and fill in any missing/invalid fields rather than crashing,
-    so a single bad obligation doesn't discard the whole extraction.
-    """
     if not isinstance(item, dict):
-        raise RuntimeError(
-            f"Obligation at index {index} is not a JSON object: {item!r}"
-        )
-
+        return {"text": f"Obligation {index + 1}", "priority": "medium"}
     priority = item.get("priority", "medium")
-    if priority not in _VALID_PRIORITIES:
+    if priority not in _VALID_LEVELS:
         priority = "medium"
-
-    status = item.get("status", "draft")
-    if status not in _VALID_STATUSES:
-        status = "draft"
-
     return {
-        "title": str(item.get("title", f"Untitled Obligation {index + 1}")),
-        "description": str(item.get("description", "")),
-        "sourceQuote": str(item.get("sourceQuote", "")),
+        "text": str(item.get("text", f"Obligation {index + 1}")),
         "priority": priority,
-        "status": status,
     }
+
+
+def _validate_risk(item: dict, index: int) -> dict:
+    if not isinstance(item, dict):
+        return {"text": f"Risk {index + 1}", "severity": "medium"}
+    severity = item.get("severity", "medium")
+    if severity not in _VALID_LEVELS:
+        severity = "medium"
+    return {
+        "text": str(item.get("text", f"Risk {index + 1}")),
+        "severity": severity,
+    }
+
+
+def _validate_action(item: dict, index: int) -> dict:
+    if not isinstance(item, dict):
+        return {"text": f"Action {index + 1}"}
+    return {"text": str(item.get("text", f"Action {index + 1}"))}

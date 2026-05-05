@@ -104,9 +104,22 @@ class AdminInviteCodeResponse(BaseModel):
     expiresInDays: int
 
 
+# ── Extracted items (direct from LLM, returned alongside stored obligations) ─
+
+class ExtractedRisk(BaseModel):
+    text: str
+    severity: str
+
+
+class ExtractedAction(BaseModel):
+    text: str
+
+
 # ── Response wrappers ──────────────────────────────────────────────────────
 
 class ProcessDocumentResponse(BaseModel):
     document: Document
     obligations: list[Obligation]
     remainingRuns: Optional[int] = None
+    risks: list[ExtractedRisk] = []
+    actions: list[ExtractedAction] = []

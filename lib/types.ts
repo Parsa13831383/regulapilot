@@ -72,6 +72,15 @@ export interface BackendObligation {
   ownerUserId?: string | null;
 }
 
+export interface BackendRisk {
+  text: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface BackendAction {
+  text: string;
+}
+
 export interface BackendDocument {
   id: string;
   title: string;
@@ -81,4 +90,6 @@ export interface BackendProcessResponse {
   document: BackendDocument;
   obligations: BackendObligation[];
   remainingRuns?: number | null;
+  risks?: BackendRisk[];
+  actions?: BackendAction[];
 }

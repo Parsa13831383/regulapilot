@@ -20,11 +20,12 @@ from schemas import (
     User, UserCreate,
     Document, DocumentCreate, DocumentStatus,
     Obligation, ObligationUpdate, ObligationStatus,
+    ExtractedRisk, ExtractedAction,
     ProcessDocumentResponse,
     RedeemCodeRequest, RedeemCodeResponse,
     AdminInviteCodeResponse,
 )
-from LlmService import extract_obligations_from_text
+from LlmService import extract_compliance_data
 from database import Base, engine, get_db, InviteCode, SessionRecord
 
 app = FastAPI(title="RegulaPilot API", version="0.1.0")
@@ -237,7 +238,7 @@ def process_document(
     documents_db[document_id] = doc
 
     try:
-        extracted = extract_obligations_from_text(doc.content)
+        extracted = extract_compliance_data(doc.content)
     except RuntimeError as exc:
         # Roll back doc status and release the DB lock without decrementing
         documents_db[document_id] = doc.model_copy(
@@ -251,15 +252,15 @@ def process_document(
     db.commit()
 
     created_obligations: list[Obligation] = []
-    for item in extracted:
+    for item in extracted["obligations"]:
         obligation = Obligation(
             id=new_id(),
             documentId=document_id,
-            title=item["title"],
-            description=item["description"],
-            sourceQuote=item["sourceQuote"],
+            title=item["text"],
+            description="",
+            sourceQuote="",
             priority=item["priority"],
-            status=item.get("status", ObligationStatus.draft),
+            status=ObligationStatus.draft,
             createdAt=now(),
             updatedAt=now(),
         )
@@ -273,6 +274,8 @@ def process_document(
         document=doc,
         obligations=created_obligations,
         remainingRuns=session_record.remaining_runs,
+        risks=[ExtractedRisk(**r) for r in extracted["risks"]],
+        actions=[ExtractedAction(**a) for a in extracted["actions"]],
     )
 
 

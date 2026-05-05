@@ -2,6 +2,8 @@ import type {
   AuthSession,
   AnalysisResult,
   BackendObligation,
+  BackendRisk,
+  BackendAction,
   BackendProcessResponse,
   Priority,
 } from './types';
@@ -99,16 +101,20 @@ async function processDocument(
 // ── High-level: analyse document ───────────────────────────────────────────
 
 function mapToAnalysisResult(
-  docTitle: string,
   obligations: BackendObligation[],
+  risks: BackendRisk[],
+  actions: BackendAction[],
 ): AnalysisResult {
   const highCount = obligations.filter((o) => o.priority === 'high').length;
 
-  const summary = `Found ${obligations.length} compliance obligation${obligations.length !== 1 ? 's' : ''} in the document. ${
+  const summary = [
+    `Found ${obligations.length} obligation${obligations.length !== 1 ? 's' : ''}`,
+    `${risks.length} risk${risks.length !== 1 ? 's' : ''}`,
+    `and ${actions.length} action${actions.length !== 1 ? 's' : ''}.`,
     highCount > 0
       ? `${highCount} high-priority item${highCount !== 1 ? 's' : ''} require immediate attention.`
-      : 'No high-priority items detected.'
-  }`;
+      : 'No high-priority items detected.',
+  ].join(', ').replace(', and', ' and');
 
   const mappedObligations = obligations.map((o) => ({
     id: o.id,
@@ -121,18 +127,14 @@ function mapToAnalysisResult(
     sourceExcerpt: o.sourceQuote,
   }));
 
-  const riskFlags = obligations
-    .filter((o) => o.priority === 'high' || o.priority === 'medium')
-    .map((o) => ({
-      id: `${o.id}-risk`,
-      title: o.title,
-      description: o.description,
-      severity: o.priority as Priority,
-    }));
+  const riskFlags = risks.map((r, i) => ({
+    id: `risk-${i}`,
+    title: r.text.length > 80 ? `${r.text.slice(0, 80)}…` : r.text,
+    description: r.text,
+    severity: r.severity as Priority,
+  }));
 
-  const recommendedActions = obligations.map(
-    (o) => `Review and assign: "${o.title}"`,
-  );
+  const recommendedActions = actions.map((a) => a.text);
 
   return { summary, obligations: mappedObligations, riskFlags, recommendedActions };
 }
@@ -150,8 +152,9 @@ export async function analyseDocument(
   const processed = await processDocument(doc.id, session.token);
 
   const analysisResult = mapToAnalysisResult(
-    processed.document.title,
     processed.obligations,
+    processed.risks ?? [],
+    processed.actions ?? [],
   );
 
   return {
