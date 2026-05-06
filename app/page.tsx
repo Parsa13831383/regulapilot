@@ -6,9 +6,10 @@ import { HowItWorks } from '@/components/landing/how-it-works';
 import { FounderDemo } from '@/components/landing/founder-demo';
 import { AccessCodeForm } from '@/components/landing/access-code-form';
 import { DashboardView } from '@/components/dashboard/dashboard-view';
+import { OnboardingPage } from '@/components/landing/onboarding-page';
 import type { AuthSession } from '@/lib/types';
 
-type View = 'landing' | 'access-code' | 'dashboard';
+type View = 'landing' | 'onboarding' | 'access-code' | 'dashboard';
 
 const SESSION_KEY = 'regulapilot_session';
 
@@ -48,6 +49,10 @@ export default function Home() {
     }
   };
 
+  const handleViewWorkflow = () => {
+    setView('onboarding');
+  };
+
   const handleSessionReady = (newSession: AuthSession) => {
     saveSession(newSession);
     setSession(newSession);
@@ -74,6 +79,15 @@ export default function Home() {
     }
   };
 
+  if (view === 'onboarding') {
+    return (
+      <OnboardingPage
+        onBack={() => setView('landing')}
+        onGetAccess={() => setView('access-code')}
+      />
+    );
+  }
+
   if (view === 'access-code') {
     return (
       <AccessCodeForm
@@ -99,7 +113,7 @@ export default function Home() {
     <main className="min-h-screen bg-background">
       <Hero
         onTryDemo={handleTryDemo}
-        onViewWorkflow={handleTryDemo}
+        onViewWorkflow={handleViewWorkflow}
       />
       <HowItWorks />
       <FounderDemo />
