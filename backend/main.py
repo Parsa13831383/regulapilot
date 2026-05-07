@@ -47,7 +47,7 @@ app.add_middleware(
 # ── Config ─────────────────────────────────────────────────────────────────
 
 ADMIN_SECRET: str = os.getenv("ADMIN_SECRET", "")
-CODE_TTL = timedelta(days=3)
+CODE_TTL = timedelta(days=153)  # ~5 months
 SESSION_RUNS = 2  # LLM processing runs granted per redeemed code
 
 # ── In-memory stores (users / documents / obligations only) ────────────────

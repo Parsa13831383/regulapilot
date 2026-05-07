@@ -18,7 +18,7 @@ interface AccessCodeFormProps {
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_code: 'This access code is not recognised. Please check and try again.',
   already_used: 'This access code has already been used. Each code is single-use — request a new one.',
-  expired_code: 'This access code has expired (codes are valid for 3 days). Please request a new one.',
+  expired_code: 'This access code has expired (codes are valid for 5 months). Please request a new one.',
   no_remaining_runs: 'This access code has no remaining runs. Please request a new one.',
 };
 
